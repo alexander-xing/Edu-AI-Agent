@@ -143,7 +143,7 @@ def fetch_edu_news(days=30):
     return results
 
 # --------------------------------------------------------------------------------
-# 3. 邮件格式化与发送
+# 2. 邮件格式化与发送
 # --------------------------------------------------------------------------------
 
 def format_html(data):
@@ -196,7 +196,8 @@ def send_email():
     """
 
     msg = MIMEMultipart()
-    msg['Subject'] = f"【30天深度精华版】全球教育洞察速递 ({datetime.now().strftime('%m/%d')})"
+    # 按照要求修改的主题
+    msg['Subject'] = f"Ying大人的'垂直教育情报每日滚动刷新'：30天全球深度精华版 (10+10) ({datetime.now().strftime('%m/%d')})"
     msg['From'] = f"Edu Intelligence Agent <{sender}>"
     msg['To'] = ", ".join(receivers)
     msg.attach(MIMEText(email_template, 'html'))
