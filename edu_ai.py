@@ -92,7 +92,7 @@ def fetch_edu_intelligence(days=14):
     return results
 
 # --------------------------------------------------------------------------------
-# 3. 邮件排版美化 (卡片边框版)
+# 3. 邮件排版美化 (含底部爱心设计)
 # --------------------------------------------------------------------------------
 
 def format_html_refined(data):
@@ -108,13 +108,11 @@ def format_html_refined(data):
     ]
     
     for key, label, color in mapping:
-        # 分区大标题
         if key == "cn_policy": 
             html += f'<tr><td style="padding:20px 0 10px 0; font-size:18px; font-weight:bold; color:{color}; border-bottom:2px solid {color};">PART A：中国教育洞察</td></tr>'
         if key == "intl_admission":
             html += f'<tr><td style="padding:30px 0 10px 0; font-size:18px; font-weight:bold; color:{color}; border-bottom:2px solid {color};">PART B：国外教育洞察</td></tr>'
         
-        # 子模块卡片容器
         html += f'<tr><td style="padding:15px 0;">'
         html += f'<div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.05);">'
         html += f'<div style="background:{color}; color:#fff; padding:8px 15px; font-size:14px; font-weight:bold;">{label}</div>'
@@ -136,12 +134,23 @@ def format_html_refined(data):
 
 def send_intelligence_report():
     sender, pw = "alexanderxyh@gmail.com", os.environ.get('EMAIL_PASSWORD')
+    # 保持接收地址一致
     receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
     
     print("🛰️ 正在精准抓取 7 大垂直模块，排除无关信息中...")
     data = fetch_edu_intelligence(days=14)
     content_rows = format_html_refined(data)
     
+    # 底部爱心 HTML 代码
+    heart_html = """
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+        <div style="display: inline-block; position: relative; width: 50px; height: 45px;">
+            <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(-45deg); left: 13px; transform-origin: 0 100%;"></div>
+            <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(45deg); left: -12px; transform-origin: 100% 100%;"></div>
+        </div>
+    </div>
+    """
+
     email_template = f"""
     <html><body style="font-family:'PingFang SC',sans-serif; background:#f4f7f9; padding:20px;">
         <div style="max-width:700px; margin:0 auto;">
@@ -149,9 +158,15 @@ def send_intelligence_report():
                 <h2 style="color:#1e293b; margin:0;">Ying大人的'垂直教育情报（每日刷新）</h2>
                 <p style="font-size:12px; color:#64748b; margin-top:5px;">14天精华追踪 | {datetime.now().strftime('%Y-%m-%d')}</p>
             </div>
+            
             <table style="width:100%; border-collapse:collapse;">{content_rows}</table>
-            <div style="padding:30px; text-align:center; font-size:10px; color:#94a3b8;">
-                本报告由XING YINGHUA先生给XIA YING女士定制的教育Agent 生成 | 信号源：官方名校网 & 精准垂直教育媒体等 | 搜索范围：本邮件之前14天
+            
+            {heart_html}
+            
+            <div style="padding:10px 30px 40px 30px; text-align:center; font-size:11px; color:#94a3b8; line-height:1.6;">
+                <p style="margin:0; font-weight:bold; color:#64748b;">献给 XIA YING 女士</p>
+                本报告由 XING YINGHUA 先生定制的教育 Agent 生成<br>
+                信号源：官方名校网 & 精准垂直教育媒体等 | 搜索范围：14天
             </div>
         </div>
     </body></html>"""
@@ -166,7 +181,7 @@ def send_intelligence_report():
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, pw)
             server.send_message(msg)
-        print("✅ 报告已成功刷新并美化发送。")
+        print("✅ 报告已成功刷新，带爱心的定制版已发送。")
     except Exception as e:
         print(f"❌ 失败: {e}")
 
