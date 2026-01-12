@@ -3,6 +3,7 @@ import smtplib
 import feedparser
 import urllib.parse
 import time
+import re
 from datetime import datetime, timedelta
 from time import mktime
 from email.mime.text import MIMEText
@@ -21,6 +22,9 @@ def fetch_edu_intelligence(days=14):
         "intl_admission": [], "intl_ai_case": [], "intl_expert": []
     }
     
+    # 用于全局去重
+    seen_titles = set()
+
     # --- 中国部分：4个子模块 ---
     cn_queries = {
         "cn_policy": '(教育部 OR 国务院) (教育政策 OR 评价改革 OR 十五五规划) OR "教育家" (未来教育 OR 洞察)',
@@ -29,38 +33,51 @@ def fetch_edu_intelligence(days=14):
         "cn_ai_case": '(中学 OR 初中 OR 高中) (AI教学 OR 智慧课堂 OR 数字化转型 OR 人工智能通识课) 案例'
     }
 
-    # --- 国际部分：3个子模块 ---
+    # --- 国际部分：3个子模块 (已根据最新精准策略更新) ---
     intl_queries = {
-        "intl_admission": '(site:edu OR "Top 50 University") (Admissions OR Policy) (Chinese students OR China) 2026',
-        "intl_ai_case": '(site:edsurge.com OR site:chronicle.com OR site:edweek.org) (Generative AI OR Use Case OR Practice)',
-        "intl_expert": '(Professor OR Scholar OR Dean) (Future of Higher Education OR Trends OR AI Insight)'
+        # 维度 1：锁定 .edu 官网及 2026 招生政策
+        "intl_admission": 'site:edu "Admissions" (China OR "international students") "2026" (policy OR update)',
+        # 维度 2：锁定垂直教育媒体获取真实 AI 实践案例
+        "intl_ai_case": '(site:edsurge.com OR site:chronicle.com OR site:edweek.org) "Generative AI" ("use case" OR classroom OR pilot)',
+        # 维度 3：锁定顶级名校专家头衔与趋势洞察
+        "intl_expert": '(Professor OR Dean OR Provost) "future of education" (AI OR trends OR "skills gap") site:edu OR site:nytimes.com'
     }
 
     def process_feed(queries, target_key, lang='zh-CN', gl='CN'):
         for key, q in queries.items():
             if key != target_key: continue
+            # Google News RSS 接口
             url = f"https://news.google.com/rss/search?q={urllib.parse.quote(q)}&hl={lang}&gl={gl}"
             feed = feedparser.parse(url)
+            
             for entry in feed.entries:
                 if not hasattr(entry, 'published_parsed'): continue
                 pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
                 if pub_time < threshold: continue
                 
-                # 每子模块限额 5 条
+                # 模块限额 5 条
                 if len(results[key]) >= 5: break
                 
+                # 基础去重逻辑
+                clean_title = re.sub(r'[^\w]', '', entry.title)
+                if clean_title in seen_titles: continue
+                seen_titles.add(clean_title)
+                
                 title = entry.title
+                # 国际内容翻译
                 if lang != 'zh-CN':
-                    try: title = translator.translate(title)
+                    try: 
+                        title = translator.translate(title)
+                        time.sleep(0.3) # 避免翻译过快被封
                     except: pass
                 
                 results[key].append({
                     "title": title,
-                    "source": entry.source.get('title', '权威来源'),
+                    "source": entry.source.get('title', '权威来源') if hasattr(entry, 'source') else '教育官网',
                     "url": entry.link,
                     "date": pub_time.strftime('%m-%d')
                 })
-            time.sleep(1)
+            time.sleep(1) # 频率限制
 
     # 执行抓取
     for k in cn_queries.keys(): process_feed(cn_queries, k, 'zh-CN', 'CN')
@@ -69,12 +86,11 @@ def fetch_edu_intelligence(days=14):
     return results
 
 # --------------------------------------------------------------------------------
-# 2. 邮件美化模版
+# 2. 邮件美化模版 (保持原有结构)
 # --------------------------------------------------------------------------------
 
 def format_html(data):
     html = ""
-    # 定义模块映射与样式
     mapping = [
         ("cn_policy", "🏛️ 1. 国家政策与教育家洞察", "#c02424"),
         ("cn_c9", "🎓 2. C9名校招生与专业动态", "#c02424"),
@@ -86,21 +102,20 @@ def format_html(data):
     ]
     
     for key, label, color in mapping:
-        # 分区标题
         if key == "cn_policy": 
-            html += f'<tr><td style="padding:10px 15px; background:#f8fafc; border-left:5px solid {color}; font-size:18px; font-weight:bold; color:{color};">第一部分：中国教育洞察</td></tr>'
+            html += f'<tr><td style="padding:15px; background:#f8fafc; border-left:6px solid {color}; font-size:18px; font-weight:bold; color:{color};">第一部分：中国教育洞察</td></tr>'
         if key == "intl_admission":
-            html += f'<tr><td style="padding:10px 15px; background:#f8fafc; border-left:5px solid {color}; font-size:18px; font-weight:bold; color:{color};">第二部分：国外教育洞察</td></tr>'
+            html += f'<tr><td style="padding:15px; background:#f8fafc; border-left:6px solid {color}; font-size:18px; font-weight:bold; color:{color};">第二部分：国外教育洞察</td></tr>'
         
         html += f'<tr><td style="padding:8px 15px; font-size:14px; font-weight:bold; color:#475569; background:#f1f5f9;">{label}</td></tr>'
         
         items = data.get(key, [])
         if not items:
-            html += '<tr><td style="padding:10px 15px; font-size:13px; color:#94a3b8;">本期暂无更新</td></tr>'
+            html += '<tr><td style="padding:10px 15px; font-size:13px; color:#94a3b8; background:#fff;">本期暂无更新</td></tr>'
         else:
             for item in items:
                 html += f"""
-                <tr><td style="padding:12px 15px; border-bottom:1px solid #f1f5f9;">
+                <tr><td style="padding:12px 15px; border-bottom:1px solid #f1f5f9; background:#fff;">
                     <a href="{item['url']}" style="text-decoration:none; color:#1e293b; font-size:14px; font-weight:500;">{item['title']}</a>
                     <div style="font-size:11px; color:#94a3b8; margin-top:5px;">🏢 {item['source']} | 📅 {item['date']}</div>
                 </td></tr>"""
@@ -111,6 +126,10 @@ def send_intelligence_report():
     pw = os.environ.get('EMAIL_PASSWORD')
     receivers = ["47697205@qq.com", "54517745@qq.com"]
     
+    if not pw:
+        print("❌ 错误：未发现 EMAIL_PASSWORD 环境变量")
+        return
+
     data = fetch_edu_intelligence(days=14)
     content_rows = format_html(data)
     
@@ -119,26 +138,28 @@ def send_intelligence_report():
         <div style="max-width:750px; margin:0 auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
             <div style="background:#1e293b; padding:35px; text-align:center; color:#fff;">
                 <h1 style="margin:0; font-size:24px; letter-spacing:1px;">Ying大人的"垂直教育情报每日滚动刷新"</h1>
-                <p style="font-size:14px; opacity:0.8; margin-top:10px;">30天全球深度精华版 (全方位细化 7 子模块版)</p>
+                <p style="font-size:14px; opacity:0.8; margin-top:10px;">14天全球深度精华版 (7大垂直模块)</p>
             </div>
             <table style="width:100%; border-collapse:collapse;">{content_rows}</table>
             <div style="padding:20px; background:#f8fafc; font-size:11px; color:#94a3b8; text-align:center;">
-                监控范围：京沪深杭宁五城名校、C9 联盟、Top 50 欧美大学、AI 垂直教育源
+                监控范围：京沪深杭宁名校、C9联盟、Top 50名校官网、垂直AI教育源
             </div>
         </div>
     </body></html>"""
 
     msg = MIMEMultipart()
-    # 标题按照您的严格要求设置
     msg['Subject'] = f"Ying大人的'垂直教育情报每日滚动刷新'：30天全球深度精华版 (10+10) ({datetime.now().strftime('%m/%d')})"
     msg['From'] = f"Edu Intelligence Agent <{sender}>"
     msg['To'] = ", ".join(receivers)
     msg.attach(MIMEText(email_template, 'html'))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender, pw)
-        server.send_message(msg)
-    print("🚀 细化版重构报告已成功发送。")
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender, pw)
+            server.send_message(msg)
+        print("🚀 细化版重构报告已成功发送至目标邮箱。")
+    except Exception as e:
+        print(f"❌ 发送失败: {e}")
 
 if __name__ == "__main__":
     send_intelligence_report()
