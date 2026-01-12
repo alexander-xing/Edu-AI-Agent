@@ -33,14 +33,16 @@ def fetch_edu_intelligence(days=14):
         "cn_ai_case": '(中学 OR 初中 OR 高中) (AI教学 OR 智慧课堂 OR 数字化转型 OR 人工智能通识课) 案例'
     }
 
-    # --- 国际部分：3个子模块 (已根据最新精准策略更新) ---
+    # --- 国际部分：3个子模块 (强化排除逻辑版) ---
     intl_queries = {
-        # 维度 1：锁定 .edu 官网及 2026 招生政策
-        "intl_admission": 'site:edu "Admissions" (China OR "international students") "2026" (policy OR update)',
-        # 维度 2：锁定垂直教育媒体获取真实 AI 实践案例
-        "intl_ai_case": '(site:edsurge.com OR site:chronicle.com OR site:edweek.org) "Generative AI" ("use case" OR classroom OR pilot)',
-        # 维度 3：锁定顶级名校专家头衔与趋势洞察
-        "intl_expert": '(Professor OR Dean OR Provost) "future of education" (AI OR trends OR "skills gap") site:edu OR site:nytimes.com'
+        # 维度 1：锁定招生办政策，排除医疗、健康、疫苗、临床等干扰
+        "intl_admission": 'site:edu (Admissions OR "Entry Requirements") ("Chinese students" OR "International students") "2026" -clinical -medical -vaccine -health',
+        
+        # 维度 2：锁定教学实践，排除纯技术研发或生物医疗 AI
+        "intl_ai_case": '(site:edsurge.com OR site:chronicle.com OR site:edweek.org) "Generative AI" (Classroom OR Curriculum OR "Teaching Practice") -oncology -biotech -protein',
+        
+        # 维度 3：锁定教育趋势，排除护理、流行病学等非教育类专家观点
+        "intl_expert": 'site:edu ("Future of Higher Education" OR "Educational Trends") (Professor OR Dean OR Provost) -nursing -epidemiology -surgery'
     }
 
     def process_feed(queries, target_key, lang='zh-CN', gl='CN'):
