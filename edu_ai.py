@@ -100,7 +100,7 @@ def format_html_refined(data):
     mapping = [
         ("cn_policy", "🏛️ 政策与教育家洞察", "#c02424"),
         ("cn_c9", "🎓 C9名校招生动态", "#c02424"),
-        ("cn_highschool", "🏫 1梯队国高升学", "#c02424"),
+        ("cn_highschool", "🏫 1梯队国际高中", "#c02424"),
         ("cn_ai_case", "🤖 国内AI教学实践", "#c02424"),
         ("intl_admission", "🌍 TOP50招生政策", "#1a365d"),
         ("intl_ai_case", "💡 海外AI教学案例", "#1a365d"),
@@ -151,7 +151,7 @@ def send_intelligence_report():
             </div>
             <table style="width:100%; border-collapse:collapse;">{content_rows}</table>
             <div style="padding:30px; text-align:center; font-size:10px; color:#94a3b8;">
-                本报告由XINGYINGHUA先生给YING女士打造的教育Agent 生成 | 信号源：官方名校网 & 精准教育媒体 | 搜索范围：14天
+                本报告由XING YINGHUA先生给XIA YING女士定制的教育Agent 生成 | 信号源：官方名校网 & 精准垂直教育媒体等 | 搜索范围：本邮件之前14天
             </div>
         </div>
     </body></html>"""
