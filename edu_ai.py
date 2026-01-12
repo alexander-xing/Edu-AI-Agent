@@ -28,7 +28,7 @@ def get_fingerprint(title):
     return "".join(re.findall(r'[\u4e00-\u9fa5a-zA-Z0-9]', title))[:30].lower()
 
 # --------------------------------------------------------------------------------
-# 2. 垂直情报抓取核心 (保持14天)
+# 2. 垂直情报抓取核心
 # --------------------------------------------------------------------------------
 
 def fetch_edu_intelligence(days=14):
@@ -48,7 +48,7 @@ def fetch_edu_intelligence(days=14):
         "cn_ai_case": '(中学 OR 初中 OR 高中) (AI教学 OR 智慧课堂 OR 数字化转型 OR 人工智能通识课) 案例'
     }
 
-    # --- 国际部分 (3个子模块) ---
+    # --- 国际部分 (3个子模块 - 强化排除版) ---
     intl_queries = {
         "intl_admission": 'site:edu (Admissions OR "Entry Requirements") ("Chinese students" OR "International students") "2026" -clinical -medical -vaccine -health',
         "intl_ai_case": '(site:edsurge.com OR site:chronicle.com OR site:edweek.org) "Generative AI" (Classroom OR Curriculum OR "Teaching Practice") -oncology -biotech -protein',
@@ -65,6 +65,7 @@ def fetch_edu_intelligence(days=14):
             pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
             if pub_time < threshold: continue
             
+            # 硬核过滤逻辑
             if is_garbage_content(entry.title): continue
             fp = get_fingerprint(entry.title)
             if fp in seen_fps or len(results[target_key]) >= 5: continue
@@ -91,7 +92,7 @@ def fetch_edu_intelligence(days=14):
     return results
 
 # --------------------------------------------------------------------------------
-# 3. 邮件排版美化 (保留爱心 + 新增Logo)
+# 3. 邮件排版美化 (含底部爱心设计)
 # --------------------------------------------------------------------------------
 
 def format_html_refined(data):
@@ -133,7 +134,8 @@ def format_html_refined(data):
 
 def send_intelligence_report():
     sender, pw = "alexanderxyh@gmail.com", os.environ.get('EMAIL_PASSWORD')
-    receivers = ["54517745@qq.com"]
+    # 保持接收地址一致
+    receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
     
     print("🛰️ 正在精准抓取 7 大垂直模块，排除无关信息中...")
     data = fetch_edu_intelligence(days=14)
@@ -141,20 +143,11 @@ def send_intelligence_report():
     
     # 底部爱心 HTML 代码
     heart_html = """
-    <div style="text-align: center; margin-top: 40px; margin-bottom: 10px;">
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
         <div style="display: inline-block; position: relative; width: 50px; height: 45px;">
             <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(-45deg); left: 13px; transform-origin: 0 100%;"></div>
             <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(45deg); left: -12px; transform-origin: 100% 100%;"></div>
         </div>
-    </div>
-    """
-
-    # 专属 Logo 图片 (使用豆包生成的稳定链接)
-    logo_html = """
-    <div style="text-align: center; margin-bottom: 20px;">
-        <img src="https://img.js.design/assets/static/f5896a9925e5138f32997782b604df0d" 
-             alt="Ying大人教育情报Logo" 
-             style="width: 140px; height: auto; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
     </div>
     """
 
@@ -169,7 +162,6 @@ def send_intelligence_report():
             <table style="width:100%; border-collapse:collapse;">{content_rows}</table>
             
             {heart_html}
-            {logo_html}
             
             <div style="padding:10px 30px 40px 30px; text-align:center; font-size:11px; color:#94a3b8; line-height:1.6;">
                 <p style="margin:0; font-weight:bold; color:#64748b;">献给 XIA YING 女士</p>
@@ -189,7 +181,7 @@ def send_intelligence_report():
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, pw)
             server.send_message(msg)
-        print("✅ 报告已成功刷新，Logo与爱心共存版已发送。")
+        print("✅ 报告已成功刷新，带爱心的定制版已发送。")
     except Exception as e:
         print(f"❌ 失败: {e}")
 
