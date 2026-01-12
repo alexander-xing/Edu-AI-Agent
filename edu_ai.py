@@ -25,7 +25,7 @@ def fetch_edu_intelligence(days=14):
     cn_queries = {
         "cn_policy": '(教育部 OR 国务院) (教育政策 OR 评价改革 OR 十五五规划) OR "教育家" (未来教育 OR 洞察)',
         "cn_c9": '(清华 OR 北大 OR 浙大 OR 复旦 OR 上海交大 OR 南大 OR 中科大 OR 西交 OR 哈工大) (招生政策 OR AI专业 OR 录取 OR 学科建设)',
-        "cn_highschool": '(人大附 OR 北京四中 OR 上海平和 OR 包玉刚 OR 深国交 OR 杭外 OR 南外) (升学榜单 OR 招生简章 OR 开放日)',
+        "cn_highschool": '(人大附 OR 北京四中 OR 上海平和 OR 包玉刚 OR 深国交 OR 杭外 OR 南外 OR WLSA) (升学榜单 OR 招生简章 OR 开放日)',
         "cn_ai_case": '(中学 OR 初中 OR 高中) (AI教学 OR 智慧课堂 OR 数字化转型 OR 人工智能通识课) 案例'
     }
 
@@ -80,8 +80,8 @@ def format_html(data):
         ("cn_c9", "🎓 2. C9名校招生与专业动态", "#c02424"),
         ("cn_highschool", "🏫 3. 五大城市一梯队国高动态", "#c02424"),
         ("cn_ai_case", "🤖 4. 国内高中/初中AI教学实践", "#c02424"),
-        ("intl_admission", "🌍 1. 全球Top 50招生政策洞察", "#1a365d"),
-        ("intl_ai_case", "💡 2. 海外大学/高中AI应用案例", "#1a365d"),
+        ("intl_admission", "🌍 1. 全球Top 50大学招生政策", "#1a365d"),
+        ("intl_ai_case", "💡 2. 海外大学或高中AI教学案例", "#1a365d"),
         ("intl_expert", "🔭 3. 国际教育趋势与专家观点", "#1a365d")
     ]
     
