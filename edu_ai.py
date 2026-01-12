@@ -136,7 +136,7 @@ def format_html_refined(data):
 
 def send_intelligence_report():
     sender, pw = "alexanderxyh@gmail.com", os.environ.get('EMAIL_PASSWORD')
-    receivers = ["47697205@qq.com", "54517745@qq.com"]
+    receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
     
     print("🛰️ 正在精准抓取 7 大垂直模块，排除无关信息中...")
     data = fetch_edu_intelligence(days=14)
@@ -151,7 +151,7 @@ def send_intelligence_report():
             </div>
             <table style="width:100%; border-collapse:collapse;">{content_rows}</table>
             <div style="padding:30px; text-align:center; font-size:10px; color:#94a3b8;">
-                本报告由垂直教育情报 Agent 生成 | 信号源：官方名校网 & 精准教育媒体 | 搜索范围：14天
+                本报告由XINGYINGHUA先生给YING女士打造的教育Agent 生成 | 信号源：官方名校网 & 精准教育媒体 | 搜索范围：14天
             </div>
         </div>
     </body></html>"""
