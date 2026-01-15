@@ -31,7 +31,7 @@ jobs:
       env:
         # 在 GitHub Repo 的 Settings -> Secrets and variables -> Actions 中设置
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-      run: python your_script_name.py  # 请确保这里替换为您脚本的文件名
+      run: python edu_ai.py  # 请确保这里替换为您脚本的文件名
 
     - name: Commit and Push changes
       run: |
