@@ -1,0 +1,49 @@
+name: Daily Education Intelligence Report
+
+on:
+  schedule:
+    # 每天早上 8:00 (UTC+8 北京时间) 运行
+    # 注意：Cron 使用的是 UTC 时间，00:00 UTC = 08:00 北京时间
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许手动点击运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        # 必须设置 persist-credentials 为 true 才能在后面 push
+        persist-credentials: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install feedparser deep-translator
+
+    - name: Run Education Agent
+      env:
+        # 在 GitHub Repo 的 Settings -> Secrets and variables -> Actions 中设置
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      run: python your_script_name.py  # 请确保这里替换为您脚本的文件名
+
+    - name: Commit and Push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 检查是否有文件更新（主要是 sent_history.txt）
+        if [[ -n "$(git status --porcelain)" ]]; then
+          git add sent_history.txt
+          git commit -m "Update sent history: $(date +'%Y-%m-%d')"
+          git push
+          echo "✅ 记忆文件已同步至仓库。"
+        else
+          echo "今日无新指纹产生，无需同步。"
+        fi
