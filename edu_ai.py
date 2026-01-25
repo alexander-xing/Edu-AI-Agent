@@ -167,8 +167,21 @@ def send_intelligence_report():
 
     # 构造邮件
     content_rows = format_html_refined(data)
-    heart_html = """<div style="text-align: center; margin-top: 40px;"><div style="display: inline-block; position: relative; width: 50px; height: 45px;"><div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(-45deg); left: 13px; transform-origin: 0 100%;"></div><div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(45deg); left: -12px; transform-origin: 100% 100%;"></div></div></div>"""
     
+    # 底部红心 + 署名文字
+    heart_html = """
+    <div style="text-align: center; margin-top: 40px;">
+        <div style="display: inline-block; position: relative; width: 50px; height: 45px;">
+            <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(-45deg); left: 13px; transform-origin: 0 100%;"></div>
+            <div style="position: absolute; width: 25px; height: 40px; background: #f43f5e; border-radius: 50px 50px 0 0; transform: rotate(45deg); left: -12px; transform-origin: 100% 100%;"></div>
+        </div>
+        <div style="margin-top: 10px; font-size: 12px; color: #94a3b8; font-style: italic;">
+            Send by Alex Xing's Agent with Love
+        </div>
+    </div>
+    """
+    
+    # 保持要求的邮件标题
     subject = f"Ying大人的'垂直教育情报每日滚动刷新'：中外深度精华版"
     
     email_template = f"""
