@@ -9,7 +9,7 @@ jobs:
   run-agent:
     runs-on: ubuntu-latest
     
-    # 允许 Action 修改仓库内容（用于保存历史记录）
+    # 必须显式声明写权限，否则最后的 git push 会报 403 错误
     permissions:
       contents: write
       
@@ -32,15 +32,20 @@ jobs:
         run: python edu_ai.py
 
       - name: Sync History (Save memory)
-        # 这一步将脚本更新的 txt 文件提交并推送到你的 GitHub 仓库
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          # 检查是否有文件变动，防止报错
-          if [ -n "$(git status --porcelain)" ]; then
-            git add sent_history.txt daily_send_log.txt
+          
+          # 先创建文件，防止脚本没运行到保存步骤时，git add 找不到文件报错
+          touch sent_history.txt daily_send_log.txt
+          
+          git add sent_history.txt daily_send_log.txt
+          
+          # 检查是否有内容变更
+          if git diff --cached --quiet; then
+            echo "No changes to history files. Skipping commit."
+          else
+            # [skip ci] 是核心，防止 commit 后再次触发 action 循环
             git commit -m "Update intelligence history [skip ci]"
             git push
-          else
-            echo "No changes to history files."
           fi
