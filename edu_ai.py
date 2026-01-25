@@ -155,7 +155,7 @@ def send_intelligence_report():
         return
 
     sender, pw = "alexanderxyh@gmail.com", os.environ.get('EMAIL_PASSWORD')
-    receivers = ["54517745@qq.com"]
+    receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
     
     # 获取情报
     data, current_fps = fetch_edu_intelligence(days=30)
