@@ -8,6 +8,11 @@ on:
 jobs:
   run-agent:
     runs-on: ubuntu-latest
+    
+    # 允许 Action 修改仓库内容（用于保存历史记录）
+    permissions:
+      contents: write
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -25,3 +30,17 @@ jobs:
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: python edu_ai.py
+
+      - name: Sync History (Save memory)
+        # 这一步将脚本更新的 txt 文件提交并推送到你的 GitHub 仓库
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          # 检查是否有文件变动，防止报错
+          if [ -n "$(git status --porcelain)" ]; then
+            git add sent_history.txt daily_send_log.txt
+            git commit -m "Update intelligence history [skip ci]"
+            git push
+          else
+            echo "No changes to history files."
+          fi
