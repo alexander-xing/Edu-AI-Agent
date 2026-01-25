@@ -140,7 +140,7 @@ def send_report():
     
     sender = "alexanderxyh@gmail.com"
     pw = os.environ.get('EMAIL_PASSWORD')
-    receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
+    receivers = ["54517745@qq.com"]
     
     data, current_fps = fetch_edu_intelligence(days=30)
     if not data["deep_dynamic"] and not data["global_briefs"]: return
