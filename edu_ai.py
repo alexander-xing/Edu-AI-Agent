@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from deep_translator import GoogleTranslator
 
 # --------------------------------------------------------------------------------
-# 1. 垂直源协议：全球教育白名单 Top 100 (涵盖名校、政府、垂直媒体)
+# 1. 垂直源协议：全球教育白名单 Top 100
 # --------------------------------------------------------------------------------
 
 WHITELIST_DOMAINS = [
@@ -41,7 +41,6 @@ WHITELIST_DOMAINS = [
     'usc.edu', 'virginia.edu', 'gatech.edu', 'lse.ac.uk', 'kcl.ac.uk'
 ]
 
-# 严格黑名单：过滤非教育类的医疗、社会负面等噪音
 BLACK_LIST = ['疫苗', '临床', '患者', '手术', '病毒', '接种', 'vaccine', 'patient', 'clinical', 'surgery', 'outbreak']
 
 # --------------------------------------------------------------------------------
@@ -54,13 +53,9 @@ def fetch_edu_intelligence(days=30):
     threshold = datetime.now() - timedelta(days=days)
     results = {"deep": [], "briefs": []}
 
-    # 任务列表：通过多个关键词组合确保 Part B 能够填满 20 条
     tasks = [
-        # Part A: 深度与政策
         {"q": "教育政策 OR 十五五规划 OR 学科建设 OR AI教学实践", "lang": "zh-CN", "gl": "CN", "cat": "deep"},
         {"q": "Higher Education Strategy OR AI Curriculum Reform OR Provost", "lang": "en", "gl": "US", "cat": "deep"},
-        
-        # Part B: 全球动态与快讯
         {"q": "Global University Admissions OR International Students OR Study Abroad", "lang": "en", "gl": "US", "cat": "briefs"},
         {"q": "EdTech Innovation OR University Ranking OR Campus News", "lang": "en", "gl": "US", "cat": "briefs"},
         {"q": "大学招生动态 OR 留学资讯 OR 国际化办学", "lang": "zh-CN", "gl": "CN", "cat": "briefs"}
@@ -71,32 +66,29 @@ def fetch_edu_intelligence(days=30):
         search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(task['q'])}&hl={task['lang']}&gl={task['gl']}"
         feed = feedparser.parse(search_url)
         
-        valid_in_task = 0
         for entry in feed.entries:
-            # 1. 时间过滤
-            pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
+            try:
+                pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
+            except:
+                continue
+                
             if pub_time < threshold: continue
             
-            # 2. 杂讯过滤
             title_l = entry.title.lower()
             if any(b in title_l for b in BLACK_LIST): continue
             
-            # 3. 垂直度校验 (白名单域名匹配 或 教育核心词)
             is_edu = any(d in entry.link.lower() for d in WHITELIST_DOMAINS) or \
                      ".edu" in entry.link.lower() or \
                      any(k in entry.title for k in ['招生', '学科', '课程', 'Education', 'University', 'Student'])
 
             if not is_edu: continue
-            
-            # 检查去重 (按标题指纹)
             if len(results[task['cat']]) >= 20: break
 
-            # 4. 翻译
             title = entry.title
             if task['lang'] != 'zh-CN':
                 try: 
                     title = translator.translate(title)
-                    time.sleep(0.3) # 稍微增加延迟，保护翻译接口
+                    time.sleep(0.3) 
                 except: pass
             
             results[task['cat']].append({
@@ -105,9 +97,8 @@ def fetch_edu_intelligence(days=30):
                 "url": entry.link,
                 "date": pub_time.strftime('%m-%d')
             })
-            valid_in_task += 1
         
-        print(f"   [状态] 类别 {task['cat']} 当前累计: {len(results[task['cat']])}")
+        print(f"    [状态] 类别 {task['cat']} 当前累计: {len(results[task['cat']])}")
 
     return results
 
@@ -116,7 +107,6 @@ def fetch_edu_intelligence(days=30):
 # --------------------------------------------------------------------------------
 
 def send_intelligence_report():
-    # --- 账号配置 ---
     sender = "alexanderxyh@gmail.com"
     pw = os.environ.get('EMAIL_PASSWORD') 
     receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
@@ -125,14 +115,13 @@ def send_intelligence_report():
         print("❌ 错误: 未找到 EMAIL_PASSWORD 环境参数。")
         return
 
-    # 抓取数据
     data = fetch_edu_intelligence(days=30)
     
-    # 构造邮件标题 (已更新为 20+20)
-    subject = "Ying大人的\"垂直教育情报每日滚动刷新\"：30天全球深度精华版 (20+20)"
+    # 修改标题为每周周报调性
+    subject = "Ying大人的\"垂直教育情报周度精选\"：30天全球深度精华版 (20+20)"
     
     def gen_list(items):
-        if not items: return "<li style='color:#999;'>今日该分类暂无更新内容</li>"
+        if not items: return "<li style='color:#999;'>本时段该分类暂无重要更新</li>"
         li_html = ""
         for i in items:
             li_html += f"""
@@ -148,7 +137,7 @@ def send_intelligence_report():
         <div style="max-width:750px; margin:0 auto; background:#fff; padding:30px; border-radius:15px; border:1px solid #e1e4e8;">
             <h2 style="color:#c02424; text-align:center; margin-bottom:5px;">{subject}</h2>
             <p style="text-align:center; font-size:12px; color:#999; margin-bottom:25px;">
-                监测范围：Top 100 全球垂直源 | 周期：30天 | 状态：测试模式(去重已关) | {datetime.now().strftime('%Y-%m-%d %H:%M')}
+                监测范围：Top 100 全球垂直源 | 频率：每周一推送 | 周期：过去30天精华 | {datetime.now().strftime('%Y-%m-%d %H:%M')}
             </p>
             
             <div style="background:#fdf2f2; padding:15px; border-radius:10px; margin-bottom:25px; border:1px solid #fbdada;">
@@ -180,9 +169,18 @@ def send_intelligence_report():
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, pw)
             server.send_message(msg)
-        print("✅ 20+20 报告发送成功！")
+        print("✅ 周一 20+20 报告发送成功！")
     except Exception as e:
         print(f"❌ 发送失败: {e}")
 
+# --------------------------------------------------------------------------------
+# 4. 执行逻辑：仅在周一运行
+# --------------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    send_intelligence_report()
+    # datetime.now().weekday() 返回 0-6，其中 0 代表周一
+    if datetime.now().weekday() == 0:
+        send_intelligence_report()
+    else:
+        current_day = datetime.now().strftime('%A')
+        print(f"今日是 {current_day}，程序设定为仅在周一执行。跳过抓取。")
