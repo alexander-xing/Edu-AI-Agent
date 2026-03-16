@@ -10,58 +10,56 @@ from email.mime.multipart import MIMEMultipart
 from deep_translator import GoogleTranslator
 
 # --------------------------------------------------------------------------------
-# 1. 精准化配置矩阵 (录取情报专项)
+# 1. 优化后的配置矩阵
 # --------------------------------------------------------------------------------
 
-# 核心信源与域名加权
-EDU_SOURCES = [
+# 权威信源白名单 (用于标识，不再硬性拦截)
+WHITE_DOMAINS = [
     'chronicle.com', 'insidehighered.com', 'thepienews.com', 'universityworldnews.com',
-    'usnews.com/education', 'timeshighereducation.com', 'topuniversities.com',
-    '.edu', 'moe.gov.cn', 'csc.edu.cn', 'britishcouncil.org'
+    'usnews.com', 'timeshighereducation.com', 'topuniversities.com', 'britishcouncil.org',
+    '.edu', 'moe.gov.cn', 'jyb.cn', 'csc.edu.cn'
 ]
 
-# 严格黑名单：过滤体育、琐事、负面社会新闻
+# 严格黑名单：彻底过滤体育、无关琐事
 STRICT_BLACK_LIST = [
     'football', 'basketball', 'athletics', 'match', 'score', 'player', 'stadium',
     'obituary', 'alumni event', 'vaccine', 'patient', 'clinical', 'hiring', 'faculty',
-    'shooting', 'protest', 'arrest'
+    'shooting', 'protest', 'arrest', 'handball', 'volleyball'
 ]
 
-# 意图触发词：标题必须包含以下核心词，确保与“录取/费用/政策”强相关
+# 拓宽后的意图触发词 (解决“误杀”问题)
 INTENT_KEYWORDS = [
     'admission', 'tuition', 'fee', 'deadline', 'policy', 'enrollment', 'requirement',
     'scholarship', 'visa', 'acceptance', 'criteria', 'standardized', 'test-optional',
-    '录取', '学费', '招生', '截止', '政策', '雅思', '托福'
+    'application', 'entry', 'updates', 'announces', '录取', '学费', '招生', '截止', '政策', 
+    '雅思', '托福', '高考', '留学'
 ]
 
 # --------------------------------------------------------------------------------
-# 2. 深度情报抓取引擎
+# 2. 抓取引擎 (放宽过滤网版)
 # --------------------------------------------------------------------------------
 
-def fetch_edu_intelligence(days=30):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在从全球垂直源提取高价值情报...")
+def fetch_edu_intelligence(days=60): # 扩大时间窗口至60天
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 启动优化版抓取引擎...")
     translator = GoogleTranslator(source='auto', target='zh-CN')
     threshold = datetime.now() - timedelta(days=days)
     results = {"policy": [], "deadlines": []}
 
-    # 针对性搜索任务：利用高级搜索指令缩小范围
+    # 任务组：去掉 site:edu 限制，采用关键词组合
     tasks = [
-        # 政策与中国留学生
-        {"q": '(site:edu OR site:gov) "Chinese students" (admission OR policy OR enrollment)', "cat": "policy", "lang": "en"},
-        # 录取标准与语言要求
-        {"q": 'Top University (IELTS OR TOEFL OR SAT) requirement update 2026', "cat": "policy", "lang": "en"},
-        # 学费与奖学金
-        {"q": 'University "tuition fees" 2025 2026 increase international', "cat": "policy", "lang": "en"},
-        # 申请截止日期
-        {"q": 'Global University "application deadlines" 2025 2026', "cat": "deadlines", "lang": "en"},
-        # 中文权威动态
-        {"q": '名校 录取政策 2025 2026 (截止时间 OR 费用变动)', "cat": "policy", "lang": "zh-CN"}
+        # 政策与录取
+        {"q": '"top university" (admission OR policy OR enrollment) 2025 2026', "cat": "policy", "lang": "en"},
+        # 针对中国学生
+        {"q": 'University (admission OR visa) "Chinese students" 2025 2026', "cat": "policy", "lang": "en"},
+        # 截止日期与费用
+        {"q": 'University (application deadline OR tuition fees) international 2025 2026', "cat": "deadlines", "lang": "en"},
+        # 中文信源补充
+        {"q": '世界名校 (录取政策 OR 招生简章 OR 学费) 2025 2026', "cat": "policy", "lang": "zh-CN"}
     ]
 
     seen_urls = set()
 
     for task in tasks:
-        # 模拟浏览器 User-Agent 增加抓取稳定性
         search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(task['q'])}&hl={task['lang']}"
         feed = feedparser.parse(search_url)
         
@@ -69,35 +67,37 @@ def fetch_edu_intelligence(days=30):
             if entry.link in seen_urls: continue
             
             try:
-                # 时间校验
                 pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
                 if pub_time < threshold: continue
             except: continue
 
             title_l = entry.title.lower()
             
-            # --- 过滤层 1：排除黑名单 ---
+            # --- 过滤逻辑 A: 排除黑名单 ---
             if any(b in title_l for b in STRICT_BLACK_LIST): continue
             
-            # --- 过滤层 2：包含意图词 ---
+            # --- 过滤逻辑 B: 必须包含意图词 ---
             if not any(k in title_l for k in INTENT_KEYWORDS): continue
             
-            # --- 过滤层 3：权威度筛选 (.edu 或特定白名单) ---
-            is_edu = ".edu" in entry.link.lower()
-            is_white = any(d in entry.link.lower() for d in EDU_SOURCES)
-            if not (is_edu or is_white): continue
-
-            # 执行翻译
+            # --- 过滤逻辑 C: 质量标识 (不再硬性丢弃非.edu内容，而是优先排序) ---
+            is_high_quality = any(d in entry.link.lower() for d in WHITE_DOMAINS)
+            
+            # 翻译与整理
             title = entry.title
             if task['lang'] != 'zh-CN':
                 try: 
                     title = translator.translate(title)
-                    time.sleep(0.5) # 避开翻译频率限制
+                    time.sleep(0.4) 
                 except: pass
+            
+            # 给权威源加个小标记
+            source_name = entry.get('source', {}).get('title', '全球垂直源')
+            if is_high_quality:
+                source_name = f"⭐ {source_name}"
             
             item = {
                 "title": title,
-                "source": entry.get('source', {}).get('title', '权威情报源'),
+                "source": source_name,
                 "url": entry.link,
                 "date": pub_time.strftime('%m-%d')
             }
@@ -105,13 +105,12 @@ def fetch_edu_intelligence(days=30):
             results[task['cat']].append(item)
             seen_urls.add(entry.link)
             
-            # 每个类别最多取 20 条最相关的
             if len(results[task['cat']]) >= 20: break
 
     return results
 
 # --------------------------------------------------------------------------------
-# 3. 邮件发送引擎 (UI 优化版)
+# 3. 邮件发送引擎
 # --------------------------------------------------------------------------------
 
 def send_intelligence_report():
@@ -123,11 +122,11 @@ def send_intelligence_report():
         print("❌ 错误: 未检测到环境变量 EMAIL_PASSWORD")
         return
 
-    data = fetch_edu_intelligence(days=30)
+    data = fetch_edu_intelligence()
     subject = f"Ying大人：全球顶尖大学录取情报精选 ({datetime.now().strftime('%Y-%m-%d')})"
     
     def gen_list_html(items):
-        if not items: return "<li style='color:#94a3b8; padding:10px;'>本周期内暂无符合筛选标准的新增内容</li>"
+        if not items: return "<li style='color:#94a3b8; padding:10px;'>本周期内未检索到满足筛选条件的高匹配内容</li>"
         li_html = ""
         for i in items:
             li_html += f"""
@@ -161,7 +160,7 @@ def send_intelligence_report():
             
             <div style="background:#f1f5f9; padding:20px; text-align:center;">
                 <p style="color:#94a3b8; font-size:12px; margin:0;">
-                    基于 30 天全球垂直信源监控 | 频率：每周一推送<br>
+                    基于 60 天全球垂直信源监控 | 频率：每周一推送<br>
                     Generated by Alex Xing's Agent
                 </p>
             </div>
@@ -179,12 +178,12 @@ def send_intelligence_report():
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, pw)
             server.send_message(msg)
-        print("✅ 报告已成功发送至收件箱！")
+        print("✅ 报告已成功发送！")
     except Exception as e:
         print(f"❌ 邮件发送失败: {e}")
 
 # --------------------------------------------------------------------------------
-# 4. 执行控制 (由 GitHub Action Cron 触发)
+# 4. 执行控制
 # --------------------------------------------------------------------------------
 
 if __name__ == "__main__":
