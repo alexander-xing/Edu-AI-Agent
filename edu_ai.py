@@ -3,7 +3,6 @@ import smtplib
 import feedparser
 import urllib.parse
 import time
-import re
 from datetime import datetime, timedelta
 from time import mktime
 from email.mime.text import MIMEText
@@ -11,99 +10,108 @@ from email.mime.multipart import MIMEMultipart
 from deep_translator import GoogleTranslator
 
 # --------------------------------------------------------------------------------
-# 1. 垂直源协议：全球教育白名单 Top 100
+# 1. 精准化配置矩阵 (录取情报专项)
 # --------------------------------------------------------------------------------
 
-WHITELIST_DOMAINS = [
-    # --- 中国权威/垂直 (30) ---
-    'moe.gov.cn', 'jyb.cn', 'eol.cn', 'jiemodui.com', 'djchina.com', 'shanghairanking.cn',
-    'lanjing.com', 'xiaozhangbang.com', '36kr.com', 'caixin.com', 'people.com.cn', 'xinhuanet.com',
-    'edu.sina.com.cn', 'edu.qq.com', 'edu.163.com', 'sohu.com', 'thepaper.cn', 'bjnews.com.cn',
-    'gmw.cn', 'rmzb.com.cn', 'zhibo8.cc', 'douban.com', 'zhihu.com', 'huxiu.com',
-    'tsinghua.edu.cn', 'pku.edu.cn', 'fudan.edu.cn', 'zju.edu.cn', 'sjtu.edu.cn', 'ustc.edu.cn',
-    
-    # --- 国际教育垂直媒体/组织 (30) ---
-    'chronicle.com', 'insidehighered.com', 'timeshighereducation.com', 'thepienews.com',
-    'edsurge.com', 'edweek.org', 'hechingerreport.org', 'universityworldnews.com',
-    'campustechnology.com', 'highereddive.com', 'k12dive.com', 'edsource.org',
-    'educationnext.org', 'chalkbeat.org', 'thejournal.com', 'smartbrief.com',
-    'worldbank.org', 'unesco.org', 'oecd.org', 'britishcouncil.org', 'collegeboard.org',
-    'ets.org', 'qs.com', 'topuniversities.com', 'usnews.com', 'forbes.com', 
-    'economist.com', 'nature.com', 'science.org', 'scientificamerican.com',
-
-    # --- 国际顶尖大学官网 (40) ---
-    'harvard.edu', 'stanford.edu', 'mit.edu', 'ox.ac.uk', 'cam.ac.uk', 'caltech.edu',
-    'princeton.edu', 'yale.edu', 'columbia.edu', 'uchicago.edu', 'upenn.edu', 'jhu.edu',
-    'berkeley.edu', 'cornell.edu', 'ucla.edu', 'ethz.ch', 'ucl.ac.uk', 'imperial.ac.uk',
-    'nus.edu.sg', 'hku.hk', 'utoronto.ca', 'unimelb.edu.au', 'nyu.edu', 'duke.edu',
-    'northwestern.edu', 'brown.edu', 'cmu.edu', 'dartmouth.edu', 'vanderbilt.edu',
-    'rice.edu', 'wustl.edu', 'emory.edu', 'nd.edu', 'georgetown.edu', 'umich.edu',
-    'usc.edu', 'virginia.edu', 'gatech.edu', 'lse.ac.uk', 'kcl.ac.uk'
+# 核心信源与域名加权
+EDU_SOURCES = [
+    'chronicle.com', 'insidehighered.com', 'thepienews.com', 'universityworldnews.com',
+    'usnews.com/education', 'timeshighereducation.com', 'topuniversities.com',
+    '.edu', 'moe.gov.cn', 'csc.edu.cn', 'britishcouncil.org'
 ]
 
-BLACK_LIST = ['疫苗', '临床', '患者', '手术', '病毒', '接种', 'vaccine', 'patient', 'clinical', 'surgery', 'outbreak']
+# 严格黑名单：过滤体育、琐事、负面社会新闻
+STRICT_BLACK_LIST = [
+    'football', 'basketball', 'athletics', 'match', 'score', 'player', 'stadium',
+    'obituary', 'alumni event', 'vaccine', 'patient', 'clinical', 'hiring', 'faculty',
+    'shooting', 'protest', 'arrest'
+]
+
+# 意图触发词：标题必须包含以下核心词，确保与“录取/费用/政策”强相关
+INTENT_KEYWORDS = [
+    'admission', 'tuition', 'fee', 'deadline', 'policy', 'enrollment', 'requirement',
+    'scholarship', 'visa', 'acceptance', 'criteria', 'standardized', 'test-optional',
+    '录取', '学费', '招生', '截止', '政策', '雅思', '托福'
+]
 
 # --------------------------------------------------------------------------------
-# 2. 增强型抓取逻辑 (20+20)
+# 2. 深度情报抓取引擎
 # --------------------------------------------------------------------------------
 
 def fetch_edu_intelligence(days=30):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 启动 20+20 深度情报抓取引擎...")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在从全球垂直源提取高价值情报...")
     translator = GoogleTranslator(source='auto', target='zh-CN')
     threshold = datetime.now() - timedelta(days=days)
-    results = {"deep": [], "briefs": []}
+    results = {"policy": [], "deadlines": []}
 
+    # 针对性搜索任务：利用高级搜索指令缩小范围
     tasks = [
-        {"q": "教育政策 OR 十五五规划 OR 学科建设 OR AI教学实践", "lang": "zh-CN", "gl": "CN", "cat": "deep"},
-        {"q": "Higher Education Strategy OR AI Curriculum Reform OR Provost", "lang": "en", "gl": "US", "cat": "deep"},
-        {"q": "Global University Admissions OR International Students OR Study Abroad", "lang": "en", "gl": "US", "cat": "briefs"},
-        {"q": "EdTech Innovation OR University Ranking OR Campus News", "lang": "en", "gl": "US", "cat": "briefs"},
-        {"q": "大学招生动态 OR 留学资讯 OR 国际化办学", "lang": "zh-CN", "gl": "CN", "cat": "briefs"}
+        # 政策与中国留学生
+        {"q": '(site:edu OR site:gov) "Chinese students" (admission OR policy OR enrollment)', "cat": "policy", "lang": "en"},
+        # 录取标准与语言要求
+        {"q": 'Top University (IELTS OR TOEFL OR SAT) requirement update 2026', "cat": "policy", "lang": "en"},
+        # 学费与奖学金
+        {"q": 'University "tuition fees" 2025 2026 increase international', "cat": "policy", "lang": "en"},
+        # 申请截止日期
+        {"q": 'Global University "application deadlines" 2025 2026', "cat": "deadlines", "lang": "en"},
+        # 中文权威动态
+        {"q": '名校 录取政策 2025 2026 (截止时间 OR 费用变动)', "cat": "policy", "lang": "zh-CN"}
     ]
 
+    seen_urls = set()
+
     for task in tasks:
-        print(f"-> 正在检索: {task['q']} ({task['lang']})")
-        search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(task['q'])}&hl={task['lang']}&gl={task['gl']}"
+        # 模拟浏览器 User-Agent 增加抓取稳定性
+        search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(task['q'])}&hl={task['lang']}"
         feed = feedparser.parse(search_url)
         
         for entry in feed.entries:
+            if entry.link in seen_urls: continue
+            
             try:
+                # 时间校验
                 pub_time = datetime.fromtimestamp(mktime(entry.published_parsed))
-            except:
-                continue
-                
-            if pub_time < threshold: continue
-            
+                if pub_time < threshold: continue
+            except: continue
+
             title_l = entry.title.lower()
-            if any(b in title_l for b in BLACK_LIST): continue
             
-            is_edu = any(d in entry.link.lower() for d in WHITELIST_DOMAINS) or \
-                     ".edu" in entry.link.lower() or \
-                     any(k in entry.title for k in ['招生', '学科', '课程', 'Education', 'University', 'Student'])
+            # --- 过滤层 1：排除黑名单 ---
+            if any(b in title_l for b in STRICT_BLACK_LIST): continue
+            
+            # --- 过滤层 2：包含意图词 ---
+            if not any(k in title_l for k in INTENT_KEYWORDS): continue
+            
+            # --- 过滤层 3：权威度筛选 (.edu 或特定白名单) ---
+            is_edu = ".edu" in entry.link.lower()
+            is_white = any(d in entry.link.lower() for d in EDU_SOURCES)
+            if not (is_edu or is_white): continue
 
-            if not is_edu: continue
-            if len(results[task['cat']]) >= 20: break
-
+            # 执行翻译
             title = entry.title
             if task['lang'] != 'zh-CN':
                 try: 
                     title = translator.translate(title)
-                    time.sleep(0.3) 
+                    time.sleep(0.5) # 避开翻译频率限制
                 except: pass
             
-            results[task['cat']].append({
+            item = {
                 "title": title,
-                "source": entry.get('source', {}).get('title', '垂直信源'),
+                "source": entry.get('source', {}).get('title', '权威情报源'),
                 "url": entry.link,
                 "date": pub_time.strftime('%m-%d')
-            })
-        
-        print(f"    [状态] 类别 {task['cat']} 当前累计: {len(results[task['cat']])}")
+            }
+            
+            results[task['cat']].append(item)
+            seen_urls.add(entry.link)
+            
+            # 每个类别最多取 20 条最相关的
+            if len(results[task['cat']]) >= 20: break
 
     return results
 
 # --------------------------------------------------------------------------------
-# 3. 邮件发送引擎
+# 3. 邮件发送引擎 (UI 优化版)
 # --------------------------------------------------------------------------------
 
 def send_intelligence_report():
@@ -112,47 +120,50 @@ def send_intelligence_report():
     receivers = ["47697205@qq.com", "54517745@qq.com", "ying.xia@wlsafoundation.com"]
     
     if not pw:
-        print("❌ 错误: 未找到 EMAIL_PASSWORD 环境参数。")
+        print("❌ 错误: 未检测到环境变量 EMAIL_PASSWORD")
         return
 
     data = fetch_edu_intelligence(days=30)
+    subject = f"Ying大人：全球顶尖大学录取情报精选 ({datetime.now().strftime('%Y-%m-%d')})"
     
-    # 修改标题为每周周报调性
-    subject = "Ying大人的\"垂直教育情报周度精选\"：30天全球深度精华版 (20+20)"
-    
-    def gen_list(items):
-        if not items: return "<li style='color:#999;'>本时段该分类暂无重要更新</li>"
+    def gen_list_html(items):
+        if not items: return "<li style='color:#94a3b8; padding:10px;'>本周期内暂无符合筛选标准的新增内容</li>"
         li_html = ""
         for i in items:
             li_html += f"""
-            <li style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <a href="{i['url']}" style="color:#1a365d; text-decoration:none; font-weight:bold; font-size:14px;">{i['title']}</a><br>
-                <span style="color:#666; font-size:12px;">🏢 {i['source']} | 📅 {i['date']}</span>
+            <li style="margin-bottom:16px; border-bottom:1px solid #f1f5f9; padding-bottom:12px;">
+                <a href="{i['url']}" style="color:#0f172a; text-decoration:none; font-weight:600; font-size:15px; display:block; margin-bottom:4px;">{i['title']}</a>
+                <span style="color:#e11d48; font-size:12px; font-weight:700; background:#fff1f2; padding:2px 6px; border-radius:4px;">{i['source']}</span>
+                <span style="color:#64748b; font-size:12px; margin-left:12px;">📅 {i['date']}</span>
             </li>
             """
         return li_html
 
     html_content = f"""
-    <html><body style="font-family:'PingFang SC', sans-serif; background:#f4f7f9; padding:20px;">
-        <div style="max-width:750px; margin:0 auto; background:#fff; padding:30px; border-radius:15px; border:1px solid #e1e4e8;">
-            <h2 style="color:#c02424; text-align:center; margin-bottom:5px;">{subject}</h2>
-            <p style="text-align:center; font-size:12px; color:#999; margin-bottom:25px;">
-                监测范围：Top 100 全球垂直源 | 频率：每周一推送 | 周期：过去30天精华 | {datetime.now().strftime('%Y-%m-%d %H:%M')}
-            </p>
-            
-            <div style="background:#fdf2f2; padding:15px; border-radius:10px; margin-bottom:25px; border:1px solid #fbdada;">
-                <h3 style="color:#c02424; margin-top:0; border-left:4px solid #c02424; padding-left:10px;">🏛️ PART A: 深度动态 (Top 20)</h3>
-                <ul style="list-style:none; padding-left:0;">{gen_list(data['deep'])}</ul>
+    <html><body style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif; background:#f8fafc; padding:20px;">
+        <div style="max-width:680px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
+            <div style="background:#e11d48; padding:30px 20px; text-align:center;">
+                <h1 style="color:#ffffff; margin:0; font-size:22px; letter-spacing:1px;">全球顶尖大学录取情报周报</h1>
+                <p style="color:#fda4af; margin-top:8px; font-size:14px;">录取政策 • 学费变动 • 申请截止窗口</p>
             </div>
             
-            <div style="background:#f4f7fa; padding:15px; border-radius:10px; border:1px solid #dbeafe;">
-                <h3 style="color:#1a365d; margin-top:0; border-left:4px solid #1a365d; padding-left:10px;">⚡ PART B: 全球快讯 (Top 20)</h3>
-                <ul style="list-style:none; padding-left:0;">{gen_list(data['briefs'])}</ul>
+            <div style="padding:30px;">
+                <div style="margin-bottom:40px;">
+                    <h3 style="color:#e11d48; font-size:16px; border-bottom:2px solid #fff1f2; padding-bottom:8px; margin-bottom:15px;">🏛️ 招生政策与学费情报 (Top 20)</h3>
+                    <ul style="list-style:none; padding:0; margin:0;">{gen_list_html(data['policy'])}</ul>
+                </div>
+                
+                <div>
+                    <h3 style="color:#2563eb; font-size:16px; border-bottom:2px solid #eff6ff; padding-bottom:8px; margin-bottom:15px;">⏳ 申请截止与关键时间窗 (Top 20)</h3>
+                    <ul style="list-style:none; padding:0; margin:0;">{gen_list_html(data['deadlines'])}</ul>
+                </div>
             </div>
             
-            <div style="text-align:center; margin-top:40px;">
-                <div style="color:#f43f5e; font-size:20px;">♥</div>
-                <div style="color:#94a3b8; font-size:12px; font-style:italic;">Send by Alex Xing's Agent with Love</div>
+            <div style="background:#f1f5f9; padding:20px; text-align:center;">
+                <p style="color:#94a3b8; font-size:12px; margin:0;">
+                    基于 30 天全球垂直信源监控 | 频率：每周一推送<br>
+                    Generated by Alex Xing's Agent
+                </p>
             </div>
         </div>
     </body></html>
@@ -160,27 +171,21 @@ def send_intelligence_report():
 
     msg = MIMEMultipart()
     msg['Subject'] = subject
-    msg['From'] = f"Ying's Edu Agent <{sender}>"
+    msg['From'] = f"Ying's Global Edu Agent <{sender}>"
     msg['To'] = ", ".join(receivers)
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        print(f"正在通过加密通道发送至 {receivers}...")
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, pw)
             server.send_message(msg)
-        print("✅ 周一 20+20 报告发送成功！")
+        print("✅ 报告已成功发送至收件箱！")
     except Exception as e:
-        print(f"❌ 发送失败: {e}")
+        print(f"❌ 邮件发送失败: {e}")
 
 # --------------------------------------------------------------------------------
-# 4. 执行逻辑：仅在周一运行
+# 4. 执行控制 (由 GitHub Action Cron 触发)
 # --------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # datetime.now().weekday() 返回 0-6，其中 0 代表周一
-    if datetime.now().weekday() == 0:
-        send_intelligence_report()
-    else:
-        current_day = datetime.now().strftime('%A')
-        print(f"今日是 {current_day}，程序设定为仅在周一执行。跳过抓取。")
+    send_intelligence_report()
