@@ -3,7 +3,9 @@ name: Global Edu Agent
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 22 * * *' # 每天北京时间 06:00 (UTC 22:00)
+    # 修改为每周日 UTC 22:00 运行
+    # 对应北京时间（UTC+8）为：每周一 06:00
+    - cron: '0 22 * * 0'
 
 jobs:
   run-agent:
